@@ -1,21 +1,28 @@
 name: rescan-codescan-sarif-manual
 
-on: workflow_dispatch
+on: 
+  workflow_dispatch:
 
 jobs:
   wait_for:
     name: Wait for any issues, gh-int + code_scanning_alerts on
     runs-on: ubuntu-latest
     container: node:16
+
+    permissions:
+      contents: read  # Required for actions/checkout to fetch the code
+      security-events: write  # Required for uploading SARIF results to GitHub Code Scanning
+
     steps:
       - name: Scan Start
         id: start
         uses: NeuraLegion/run-scan@release
         with:
-          api_token: ${{ secrets.BRIGHT_TOKEN}}
+          api_token: ${{ secrets.BRIGHT_TOKEN }}
           hostname: app.brightsec.com
           name: Bright Scan - ${{ github.sha }}
-          restart_scan: ${{ secrets.BRIGHT_SCANIDMULT}}
+          restart_scan: ${{ secrets.BRIGHT_SCANIDMULT }}
+
       - name: Wait for breakpoint
         id: wait
         uses: NeuraLegion/wait-for@release
@@ -27,6 +34,7 @@ jobs:
           code_scanning_alerts: true
           github_token: ${{ secrets.KEY_GITHUB }}
           timeout: 2400
+
       - name: Download SARIF file
         id: sarif
         env:
@@ -38,16 +46,17 @@ jobs:
           gzip -d bright.sarif.gz
           sarifFileText=$(cat bright.sarif)
           echo "sarif file text: $sarifFileText"
+
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v3
         with:
           # Path to SARIF file relative to the root of the repository
           sarif_file: bright.sarif
           # Optional category for the results
-          # Used to differentiate multiple results for one commit
           category: BrightSecurity
+
       - name: Save SARIF file
         uses: actions/upload-artifact@v4
         with: 
           name: BrightSecurity_sarif_report
-          path: bright.sarif    
+          path: bright.sarif
